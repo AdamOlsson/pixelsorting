@@ -7,12 +7,10 @@ CONST_STR_HORIZONTAL = "horizontal"
 
 no_threads = 7
 direction = CONST_STR_VERTICAL
-reverse = True #TODO Not working
+reverse = False
 
 brightness_threshold_top = 500
 brightness_threshold_bot = 100
-
-
 
 def sort_method1(array):
     summed_rbg_values = np.sum(array, axis=1)
@@ -35,13 +33,9 @@ def sort(array):
 
 def process(arr):
     start_idx, subarray = extract_subarray_to_sort(arr)
-    
-    if reverse:
-        # print("tet")
-        subarray = np.flip(subarray, axis=0)
 
     if start_idx != None:
-        arr[start_idx:] = sort(subarray)
+        arr[start_idx:] = np.flip(sort(subarray), axis=0) if reverse else sort(subarray)
 
     return arr
 
