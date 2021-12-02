@@ -1,77 +1,20 @@
 from PIL import Image
 import numpy as np
 import multiprocessing as mp
+import json
+from mars_sort import sort_method1, sort_method2, sort_method3, sort_method4
 
-from numpy.lib.index_tricks import diag_indices
+
+CONST_STR_VERTICAL = "v"
+CONST_STR_HORIZONTAL = "h"
+CONST_STR_DIAGONAL = "d"
 
 
-CONST_STR_VERTICAL = "vertical"
-CONST_STR_HORIZONTAL = "horizontal"
-CONST_STR_DIAGONAL = "diagonal"
-
-no_threads = 7
-direction = CONST_STR_DIAGONAL
-reverse = True
-brightness_threshold_bot = 100
-
-def sort_method1(array_):
-    brightness_threshold_top = 100
-
-    return_arr = array_
-
-    # select subpixels to sort
-    start = -1
-    for i, p in enumerate(return_arr):
-        if sum(p) > brightness_threshold_top:
-            start = i
-            break
-
-    # sorting
-    if start != -1:
-        array = return_arr[start:]
-        summed_rbg_values = np.sum(array, axis=1)
-        zipped = zip(summed_rbg_values, array)
-        sorted_tuple_arr = sorted(zipped, key=lambda tup:tup[0])
-        array_sorted = np.array([rgb for _, rgb in sorted_tuple_arr])
-
-        if reverse:
-            array_sorted = np.flip(array_sorted, axis=0)
-        
-        return_arr[start:] = array_sorted
-    
-    return return_arr
-
-def sort_method2(array_):
-    return_arr = array_
-
-    # rgba(107,20,13,255)
-    # select subpixels to sort
-    start = -1
-    start_sort = False
-    for i, p in enumerate(return_arr):
-        r,g,b = p
-        if  80 < r and r < 130 and 0 < g and g < 50 and 0 < b and b < 50:
-            start = i
-            break
-
-    # sorting
-    if start != -1:
-        array = return_arr[start:]
-        summed_rbg_values = np.sum(array, axis=1)
-        zipped = zip(summed_rbg_values, array)
-        sorted_tuple_arr = sorted(zipped, key=lambda tup:tup[0])
-        array_sorted = np.array([rgb for _, rgb in sorted_tuple_arr])
-
-        if reverse:
-            array_sorted = np.flip(array_sorted, axis=0)
-        
-        return_arr[start:] = array_sorted
-    
-    return return_arr
-
+with open("./config.json", "r") as f:
+    config = json.load(f)
 
 def sort(array):
-    return sort_method1(array)
+    return sort_method4(array, config)
 
 def process(array):
     return sort(array)
@@ -93,16 +36,25 @@ def chunk_diagonal1(array):
 
     return chunks
 
-def write_diagonal1(diag_idx, img, data):
-    height, width = img.shape[0:2]
-    
-    if diag_idx < height:
-        col_idx = np.arange(start=height-1-diag_idx, stop=height, step= 1)
-        row_idx = np.arange(diag_idx+1)
-        img[col_idx, row_idx] = data
-    else: # diag_idx >= height
-        pass
+def diag_idx_to_col_idx(diag_idx, img):
+    height = img.shape[0]
+    return diag_idx - (height-1)
 
+def write_diagonal1(diag_idx, img, data):
+    height, _ = img.shape[0:2]
+    
+    diag_length = data.shape[0]
+
+    if diag_idx < height:
+        # From first diag to just before first full length diag
+        cow_idx = np.arange(diag_length)
+        row_idx = np.arange(start=height-1-diag_idx, stop=height, step=1)
+        img[row_idx, cow_idx] = data
+    else:
+        diag_length = data.shape[0]
+        row_idx = np.arange(diag_length)
+        col_idx = np.arange(diag_length) + diag_idx_to_col_idx(diag_idx, img)
+        img[row_idx, col_idx] = data
 
 def write_vertical(col_idx, img, data):
     img[:,col_idx] = data
@@ -110,11 +62,16 @@ def write_vertical(col_idx, img, data):
 def write_horizontal(row_idx, img, data):
     img[row_idx] = data
 
-def pixelsort(image_path, direction=CONST_STR_HORIZONTAL):
+def pixelsort(image_path):
+
+    direction  = config["direction"]
+    no_threads = config["no_threads"]
 
     image = Image.open(image_path)
     image = np.array(image)
     height, width = image.shape[0:2]
+
+    print(height, width)
 
     itr_lenghts = {
         CONST_STR_VERTICAL:   width,
@@ -150,9 +107,10 @@ def pixelsort(image_path, direction=CONST_STR_HORIZONTAL):
     new_image_name = "img_pixelsorted.jpg"
     new_image.save(new_image_name)
 
-    print(new_image_name, height, width)
+    print(new_image_name)
 
 
 if __name__ == "__main__":
     img_path = "./mars.jpg"
-    pixelsort(img_path, direction)
+
+    pixelsort(img_path)
